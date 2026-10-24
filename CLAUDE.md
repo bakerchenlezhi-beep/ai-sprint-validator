@@ -66,10 +66,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Project
 
-Next.js (App Router, TypeScript, Tailwind v4, shadcn/ui) app, "AI Sprint Validator". `PLAN.md` is the source of truth for architecture and milestones (M1 setup and M2 mock simulation are done; M3 real LLM streaming is next). Implement only the milestone the user has approved.
+Next.js (App Router, TypeScript, Tailwind v4, shadcn/ui) app, "AI Sprint Validator". `PLAN.md` is the source of truth for architecture and milestones (M1 setup, M2 mock simulation and M3 real LLM API & streaming are 100% complete, with all 26 unit tests passing; M4, polish & export, is the active next phase). Implement only the milestone the user has approved.
 
 - Package manager: **pnpm** (via corepack). Commands: `pnpm dev`, `pnpm build`, `pnpm lint`, `npx tsc --noEmit`, `pnpm test` (Vitest; single file: `pnpm vitest run lib/sim/sse.test.ts`).
 - This Next.js version has breaking changes: per `AGENTS.md`, read the relevant guide in `node_modules/next/dist/docs/` before writing Next-specific code.
 - LLM access goes only through `lib/llm.ts` (`openai` SDK, DeepSeek defaults, config in `lib/env.ts`, vars in `.env.example`). No key means mock mode.
 - shadcn style is `base-nova` (Base UI, not Radix); check component APIs in `components/ui/` before use.
-- Simulation flow: `PitchForm` stores the pitch in `sessionStorage` and routes to `/simulate`, where `SimulationProvider` generates personas and streams events. Everything goes through `SimEvent`s -> SSE bytes (`lib/sim/sse.ts`) -> `lib/sim/reducer.ts`; M2 feeds the stream from `lib/sim/mock.ts`, and `runStream` in `SimulationProvider.tsx` is the one seam to swap for `fetch('/api/simulate')` in M3.
+- Simulation flow: `PitchForm` stores the pitch in `sessionStorage` and routes to `/simulate`, where `SimulationProvider` generates personas and streams events. Everything goes through `SimEvent`s -> SSE bytes (`lib/sim/sse.ts`) -> `lib/sim/reducer.ts`; `runStream` in `SimulationProvider.tsx` fetches `/api/simulate` (SSE from `lib/sim/orchestrator.ts` with a key, `lib/sim/mock.ts` without), and `/api/personas` and `/api/report` fall back to mock data on failure.

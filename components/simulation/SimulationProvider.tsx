@@ -1,10 +1,9 @@
 "use client";
 
 import { createContext, useCallback, useEffect, useReducer, useRef, type ReactNode } from "react";
-import { mockPersonas, mockReport, mockSimStream } from "@/lib/sim/mock";
 import { initialState, simReducer, type SimState } from "@/lib/sim/reducer";
 import { readSseEvents } from "@/lib/sim/sse";
-import type { ChatMessage, ProductPitch } from "@/types";
+import type { ChatMessage, ProductPitch, SimulationReport } from "@/types";
 
 export const PITCH_STORAGE_KEY = "sprint-validator:pitch";
 export const MAX_MESSAGES = 40;
@@ -16,6 +15,15 @@ export interface SimulationApi {
   interject: (text: string) => void;
   stop: () => void;
   generateReport: () => void;
+}
+
+async function postJson(url: string, body: unknown, signal: AbortSignal): Promise<Response> {
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
+  if (!res.ok) {
+    const { error } = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(error ?? `Request failed (${res.status})`);
+  }
+  return res;
 }
 
 export const SimulationContext = createContext<SimulationApi | null>(null);
@@ -36,12 +44,12 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     return abortRef.current.signal;
   }, []);
 
-  // Single seam for M3: swap mockSimStream for a fetch to /api/simulate.
   const runStream = useCallback(
     async (mode: "start" | "respond", pitch: ProductPitch, personas: SimState["personas"], messages: ChatMessage[], round: number, signal: AbortSignal) => {
       dispatch({ type: "SIM_STARTED" });
       try {
-        for await (const event of readSseEvents(mockSimStream({ pitch, personas, messages, mode, round, signal }))) {
+        const res = await postJson("/api/simulate", { pitch, personas, messages, mode, round }, signal);
+        for await (const event of readSseEvents(res.body!)) {
           if (signal.aborted) return;
           dispatch(event);
         }
@@ -65,10 +73,15 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     const signal = nextSignal();
     dispatch({ type: "PITCH_SUBMITTED", pitch });
     (async () => {
-      const personas = await mockPersonas(signal);
-      if (signal.aborted) return;
-      dispatch({ type: "PERSONAS_READY", personas });
-      await runStream("start", pitch, personas, [], 0, signal);
+      try {
+        const res = await postJson("/api/personas", { pitch }, signal);
+        const { personas } = (await res.json()) as { personas: SimState["personas"] };
+        if (signal.aborted) return;
+        dispatch({ type: "PERSONAS_READY", personas });
+        await runStream("start", pitch, personas, [], 0, signal);
+      } catch (err) {
+        if (!signal.aborted) dispatch({ type: "error", message: err instanceof Error ? err.message : "Could not generate personas", recoverable: false });
+      }
     })();
     return () => abortRef.current?.abort();
   }, [nextSignal, runStream]);
@@ -95,9 +108,16 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const generateReport = useCallback(() => {
     const signal = nextSignal();
     dispatch({ type: "REPORT_REQUESTED" });
-    void mockReport(stateRef.current.personas, signal).then((report) => {
-      if (!signal.aborted) dispatch({ type: "REPORT_READY", report });
-    });
+    const { pitch, personas, messages } = stateRef.current;
+    const settled = messages.map((m): ChatMessage => (m.status === "streaming" ? { ...m, status: "complete" } : m));
+    postJson("/api/report", { pitch, personas, messages: settled }, signal)
+      .then((res) => res.json() as Promise<{ report: SimulationReport }>)
+      .then(({ report }) => {
+        if (!signal.aborted) dispatch({ type: "REPORT_READY", report });
+      })
+      .catch((err) => {
+        if (!signal.aborted) dispatch({ type: "error", message: err instanceof Error ? err.message : "Report failed", recoverable: true });
+      });
   }, [nextSignal]);
 
   const canInterject =
