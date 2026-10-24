@@ -153,13 +153,18 @@ Zod schemas in `lib/validation.ts` mirror these; LLM JSON outputs (personas, rep
 - ✔ Verify: `pnpm dev` renders both pages; `tsc --noEmit` and `lint` clean.
 
 **M2 — Mock Simulation UI**
-- Implement `mock.ts`, `reducer.ts`, `SimulationProvider`, `useSimulation`, `ChatStream`, `PersonaCard` (active speaker highlight), `SummaryPanel`, form validation.
-- Mock orchestrator emits `SimEvent`s with delays through the same client SSE-handling path (in-process stream stub); interjection works against scripted replies.
-- ✔ Verify: full flow pitch → personas → 6 streamed messages → interject → mock report, no API key set. Unit tests (Vitest) for reducer and mock event order.
+- **Test setup**: `pnpm add -D vitest`; add `"test": "vitest run"` to `package.json` scripts (replaces the old placeholder; `pnpm test` must exit 0).
+- Implement `lib/sim/mock.ts`, `lib/sim/sse.ts` (SSE frame encoder + chunk-buffered stream decoder, per Transport in Section 3), `lib/sim/reducer.ts`, `SimulationProvider`, `useSimulation`, `ChatStream`, `PersonaCard` (active speaker highlight), `SummaryPanel`, form validation.
+- Mock orchestrator emits `SimEvent`s with delays, encoded as SSE frames into an in-process `ReadableStream` and consumed by the same `sse.ts` decoder the real `fetch` path will use in M3; interjection works against scripted replies.
+- **Unit tests (Vitest)**:
+  - `lib/sim/reducer.ts`: state transitions per action/`SimEvent` (e.g. `turn_start` sets `activePersonaId` and adds a streaming message, `token` appends, `turn_end` completes it, `round_end` advances `round`, `done` sets `awaitingUser`, `USER_MESSAGE` appends a user message, `RESET`), plus the error path.
+  - `lib/sim/sse.ts`: byte-slice chunk-boundary parsing. Encode a sequence of events (including multi-byte UTF-8 characters), split the bytes at every offset (and into 1-byte chunks), decode, and assert the same events in order with no dropped, duplicated or broken frames.
+  - Mock event order (`mock.ts`): `turn_start` → `token`* → `turn_end` per turn, P1 → P2 → P3, `round_end` after P3, `done` last.
+- ✔ Verify: full flow pitch → personas → 6 streamed messages → interject → mock report, no API key set; `pnpm test`, `pnpm lint` and `npx tsc --noEmit` all pass.
 
 **M3 — Real LLM API & Streaming**
-- `lib/llm.ts` (openai SDK, DeepSeek defaults), `lib/prompts.ts`, `/api/personas`, `/api/simulate` (SSE + `request.signal` forwarded to the SDK call), `/api/report`; swap client from stub to `fetch` stream with the chunk-buffered SSE reader; key-detection fallback; zod parse + retry; rate/size limits.
-- ✔ Verify: with key — personas are pitch-specific, turns stream in P1→P2→P3 order and reference earlier speakers; Stop and interject abort cleanly (no orphan upstream calls); without key — identical UX in mock mode. Orchestrator tested with a fake LLM client (turn order, abort propagation of `signal`, error recovery) and a unit test for SSE frames split across chunks.
+- `lib/llm.ts` (openai SDK, DeepSeek defaults), `lib/prompts.ts`, `/api/personas`, `/api/simulate` (SSE + `request.signal` forwarded to the SDK call), `/api/report`; swap client from the in-process stub to a `fetch` stream, reusing the M2 `sse.ts` decoder; key-detection fallback; zod parse + retry; rate/size limits.
+- ✔ Verify: with key — personas are pitch-specific, turns stream in P1→P2→P3 order and reference earlier speakers; Stop and interject abort cleanly (no orphan upstream calls); without key — identical UX in mock mode. Orchestrator tested with a fake LLM client (turn order, abort propagation of `signal`, error recovery).
 
 **M4 — Polish & Export**
 - `ExportMenu` (Markdown/JSON/copy via `lib/export.ts`), localStorage resume, loading skeletons, error/retry states, a11y (aria-live on stream, focus management), dark mode, "Demo data" badge, empty states, README with setup.
