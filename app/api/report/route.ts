@@ -7,7 +7,8 @@ export async function POST(req: Request) {
   if ("error" in body) return body.error;
   const { pitch, personas, messages } = body.data;
   try {
-    return Response.json({ report: await generateReport(pitch, personas, messages, req.signal) });
+    const { value, fellBack } = await generateReport(pitch, personas, messages, req.signal);
+    return Response.json({ report: value, fallback: fellBack });
   } catch (err) {
     return failure(err);
   }

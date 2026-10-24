@@ -1,7 +1,8 @@
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, Persona } from "@/types";
 
-export function ChatMessageBubble({ message, persona }: { message: ChatMessage; persona?: Persona }) {
+export function ChatMessageBubble({ message, persona, onRetry }: { message: ChatMessage; persona?: Persona; onRetry?: () => void }) {
   const isUser = message.role === "user";
   return (
     <div className={cn("flex gap-2", isUser && "flex-row-reverse")}>
@@ -12,7 +13,16 @@ export function ChatMessageBubble({ message, persona }: { message: ChatMessage; 
           {message.content}
           {message.status === "streaming" && <span className="ml-0.5 inline-block animate-pulse">▍</span>}
         </p>
-        {message.status === "error" && <p className="mt-1 text-xs text-destructive">This reply failed.</p>}
+        {message.status === "error" && (
+          <p className="mt-1 flex items-center gap-2 text-xs text-destructive">
+            This reply failed.
+            {onRetry && (
+              <Button variant="outline" size="xs" onClick={onRetry}>
+                Retry
+              </Button>
+            )}
+          </p>
+        )}
       </div>
     </div>
   );

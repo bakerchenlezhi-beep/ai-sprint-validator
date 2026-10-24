@@ -1,19 +1,33 @@
 "use client";
 
 import { createContext, useCallback, useEffect, useReducer, useRef, type ReactNode } from "react";
+import { toast } from "sonner";
 import { initialState, simReducer, type SimState } from "@/lib/sim/reducer";
 import { readSseEvents } from "@/lib/sim/sse";
 import type { ChatMessage, ProductPitch, SimulationReport } from "@/types";
 
 export const PITCH_STORAGE_KEY = "sprint-validator:pitch";
+const SNAPSHOT_STORAGE_KEY = "sprint-validator:snapshot";
+const FALLBACK_MESSAGE = "Couldn't reach the AI model, so this is demo data.";
 export const MAX_MESSAGES = 40;
 export const MAX_INTERJECTION_LENGTH = 500;
+
+function loadSnapshot(pitchId: string): SimState | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SNAPSHOT_STORAGE_KEY) ?? "null") as SimState | null;
+    return saved?.pitch?.id === pitchId && saved.personas?.length === 3 && Array.isArray(saved.messages) ? saved : null;
+  } catch {
+    return null;
+  }
+}
 
 export interface SimulationApi {
   state: SimState;
   canInterject: boolean;
+  canRetry: boolean;
   interject: (text: string) => void;
   stop: () => void;
+  retry: () => void;
   generateReport: () => void;
 }
 
@@ -37,6 +51,16 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     stateRef.current = state;
   });
 
+  // Snapshot between turns (not on every token) so a refresh can resume.
+  useEffect(() => {
+    if (!state.pitch || state.personas.length === 0 || state.activePersonaId) return;
+    try {
+      localStorage.setItem(SNAPSHOT_STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      // Storage unavailable or full: resume is best-effort.
+    }
+  }, [state]);
+
   /** Aborts whatever is in flight and returns a fresh signal for the next operation. */
   const nextSignal = useCallback(() => {
     abortRef.current?.abort();
@@ -45,10 +69,18 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const runStream = useCallback(
-    async (mode: "start" | "respond", pitch: ProductPitch, personas: SimState["personas"], messages: ChatMessage[], round: number, signal: AbortSignal) => {
+    async (
+      mode: "start" | "respond",
+      pitch: ProductPitch,
+      personas: SimState["personas"],
+      messages: ChatMessage[],
+      round: number,
+      signal: AbortSignal,
+      onlyPersonaId?: string,
+    ) => {
       dispatch({ type: "SIM_STARTED" });
       try {
-        const res = await postJson("/api/simulate", { pitch, personas, messages, mode, round }, signal);
+        const res = await postJson("/api/simulate", { pitch, personas, messages, mode, round, onlyPersonaId }, signal);
         for await (const event of readSseEvents(res.body!)) {
           if (signal.aborted) return;
           dispatch(event);
@@ -70,13 +102,20 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     }
     if (!pitch) return;
 
+    const saved = loadSnapshot(pitch.id);
+    if (saved) {
+      dispatch({ type: "RESTORE", state: saved });
+      return;
+    }
+
     const signal = nextSignal();
     dispatch({ type: "PITCH_SUBMITTED", pitch });
     (async () => {
       try {
         const res = await postJson("/api/personas", { pitch }, signal);
-        const { personas } = (await res.json()) as { personas: SimState["personas"] };
+        const { personas, fallback } = (await res.json()) as { personas: SimState["personas"]; fallback: boolean };
         if (signal.aborted) return;
+        if (fallback) toast.warning(FALLBACK_MESSAGE);
         dispatch({ type: "PERSONAS_READY", personas });
         await runStream("start", pitch, personas, [], 0, signal);
       } catch (err) {
@@ -105,26 +144,38 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "STOP" });
   }, []);
 
+  const retry = useCallback(() => {
+    const { pitch, personas, messages } = stateRef.current;
+    const failed = messages.at(-1);
+    if (!pitch || failed?.status !== "error" || !failed.personaId) return;
+    const signal = nextSignal();
+    dispatch({ type: "RETRY_TURN" });
+    void runStream("respond", pitch, personas, messages.slice(0, -1), failed.round, signal, failed.personaId);
+  }, [nextSignal, runStream]);
+
   const generateReport = useCallback(() => {
     const signal = nextSignal();
     dispatch({ type: "REPORT_REQUESTED" });
     const { pitch, personas, messages } = stateRef.current;
     const settled = messages.map((m): ChatMessage => (m.status === "streaming" ? { ...m, status: "complete" } : m));
     postJson("/api/report", { pitch, personas, messages: settled }, signal)
-      .then((res) => res.json() as Promise<{ report: SimulationReport }>)
-      .then(({ report }) => {
-        if (!signal.aborted) dispatch({ type: "REPORT_READY", report });
+      .then((res) => res.json() as Promise<{ report: SimulationReport; fallback: boolean }>)
+      .then(({ report, fallback }) => {
+        if (signal.aborted) return;
+        if (fallback) toast.warning(FALLBACK_MESSAGE);
+        dispatch({ type: "REPORT_READY", report });
       })
       .catch((err) => {
         if (!signal.aborted) dispatch({ type: "error", message: err instanceof Error ? err.message : "Report failed", recoverable: true });
       });
   }, [nextSignal]);
 
+  const canRetry = state.status === "awaitingUser" && state.messages.at(-1)?.status === "error";
   const canInterject =
     (state.status === "running" || state.status === "awaitingUser") && state.messages.length < MAX_MESSAGES;
 
   return (
-    <SimulationContext.Provider value={{ state, canInterject, interject, stop, generateReport }}>
+    <SimulationContext.Provider value={{ state, canInterject, canRetry, interject, stop, retry, generateReport }}>
       {children}
     </SimulationContext.Provider>
   );

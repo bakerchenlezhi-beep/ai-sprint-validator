@@ -1,6 +1,10 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ExportMenu } from "@/components/summary/ExportMenu";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Persona, SimStatus, SimulationReport } from "@/types";
 
@@ -23,13 +27,23 @@ export function SummaryPanel({
   report,
   status,
   personas,
+  title,
   onGenerate,
 }: {
   report: SimulationReport | null;
   status: SimStatus;
   personas: Persona[];
+  title: string;
   onGenerate: () => void;
 }) {
+  const headingRef = useRef<HTMLParagraphElement>(null);
+  const prevStatus = useRef(status);
+  // Move focus to the verdict when a report has just been generated (not when one is restored).
+  useEffect(() => {
+    if (status === "done" && prevStatus.current === "reporting") headingRef.current?.focus();
+    prevStatus.current = status;
+  }, [status]);
+
   return (
     <Card>
       <CardHeader>
@@ -42,7 +56,9 @@ export function SummaryPanel({
         {report ? (
           <>
             <div>
-              <p className="text-2xl font-semibold capitalize">{report.verdict}</p>
+              <p ref={headingRef} tabIndex={-1} className="text-2xl font-semibold capitalize outline-none">
+                {report.verdict}
+              </p>
               <p className="text-sm text-muted-foreground">Score {report.overallScore}/100</p>
             </div>
             <ul className="space-y-2">
@@ -65,6 +81,7 @@ export function SummaryPanel({
                 </Badge>
               ))}
             </div>
+            <ExportMenu report={report} personas={personas} title={title} />
             <List title="Risks" items={report.risks} />
             <List title="Suggested experiments" items={report.suggestedExperiments} />
             <List title="Open questions" items={report.openQuestions} />

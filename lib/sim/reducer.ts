@@ -19,6 +19,8 @@ export type SimAction =
   | { type: "SIM_STARTED" }
   | { type: "USER_MESSAGE"; message: ChatMessage }
   | { type: "STOP" }
+  | { type: "RETRY_TURN" }
+  | { type: "RESTORE"; state: SimState }
   | { type: "REPORT_REQUESTED" }
   | { type: "REPORT_READY"; report: SimulationReport }
   | { type: "RESET" };
@@ -97,6 +99,15 @@ export function simReducer(state: SimState, action: SimAction): SimState {
         messages: settle(state.messages, "complete"),
         status: state.status === "running" ? "awaitingUser" : state.status,
       };
+    case "RETRY_TURN":
+      return {
+        ...state,
+        status: "running",
+        error: null,
+        messages: state.messages.at(-1)?.status === "error" ? state.messages.slice(0, -1) : state.messages,
+      };
+    case "RESTORE":
+      return restoreState(action.state);
     case "REPORT_REQUESTED":
       return { ...state, status: "reporting" };
     case "REPORT_READY":
@@ -104,4 +115,16 @@ export function simReducer(state: SimState, action: SimAction): SimState {
     case "RESET":
       return initialState;
   }
+}
+
+/** A saved snapshot can't resume a live stream or request, so it comes back idle and waiting for the user. */
+export function restoreState(saved: SimState): SimState {
+  const inFlight = saved.status === "running" || saved.status === "reporting" || saved.status === "error";
+  return {
+    ...saved,
+    messages: settle(saved.messages, "complete"),
+    activePersonaId: null,
+    error: null,
+    status: inFlight || (saved.status === "done" && !saved.report) ? "awaitingUser" : saved.status,
+  };
 }

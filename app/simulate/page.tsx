@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSyncExternalStore } from "react";
 import { ChatStream } from "@/components/chat/ChatStream";
 import { InterjectionInput } from "@/components/chat/InterjectionInput";
 import { PersonaPanel } from "@/components/personas/PersonaPanel";
@@ -20,8 +21,24 @@ const STATUS_LABEL = {
   error: "Something went wrong",
 } as const;
 
+const DESKTOP_QUERY = "(min-width: 1024px)";
+
+// Mount chat/summary once (not once per layout), so there is a single input and a single live region.
+function useIsDesktop(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const mq = window.matchMedia(DESKTOP_QUERY);
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(DESKTOP_QUERY).matches,
+    () => true,
+  );
+}
+
 function Workspace() {
-  const { state, canInterject, interject, stop, generateReport } = useSimulation();
+  const { state, canInterject, canRetry, interject, stop, retry, generateReport } = useSimulation();
+  const isDesktop = useIsDesktop();
 
   if (!state.pitch) {
     return (
@@ -36,12 +53,12 @@ function Workspace() {
 
   const chat = (
     <div className="flex flex-col gap-3">
-      <ChatStream messages={state.messages} personas={state.personas} />
+      <ChatStream messages={state.messages} personas={state.personas} onRetry={canRetry ? retry : undefined} />
       <InterjectionInput disabled={!canInterject} maxLength={MAX_INTERJECTION_LENGTH} onSend={interject} />
     </div>
   );
   const summary = (
-    <SummaryPanel report={state.report} status={state.status} personas={state.personas} onGenerate={generateReport} />
+    <SummaryPanel report={state.report} status={state.status} personas={state.personas} title={state.pitch.title} onGenerate={generateReport} />
   );
 
   return (
@@ -69,21 +86,23 @@ function Workspace() {
 
       <PersonaPanel personas={state.personas} activePersonaId={state.activePersonaId} />
 
-      {/* Desktop: chat + summary side by side */}
-      <div className="hidden gap-4 lg:grid lg:grid-cols-[1fr_20rem]">
-        {chat}
-        {summary}
-      </div>
-
-      {/* Mobile: summary becomes a tab */}
-      <Tabs defaultValue="chat" className="lg:hidden">
-        <TabsList>
-          <TabsTrigger value="chat">Chat</TabsTrigger>
-          <TabsTrigger value="summary">Summary</TabsTrigger>
-        </TabsList>
-        <TabsContent value="chat">{chat}</TabsContent>
-        <TabsContent value="summary">{summary}</TabsContent>
-      </Tabs>
+      {isDesktop ? (
+        // Desktop: chat + summary side by side
+        <div className="grid grid-cols-[1fr_20rem] gap-4">
+          {chat}
+          {summary}
+        </div>
+      ) : (
+        // Mobile: summary becomes a tab
+        <Tabs defaultValue="chat">
+          <TabsList>
+            <TabsTrigger value="chat">Chat</TabsTrigger>
+            <TabsTrigger value="summary">Summary</TabsTrigger>
+          </TabsList>
+          <TabsContent value="chat">{chat}</TabsContent>
+          <TabsContent value="summary">{summary}</TabsContent>
+        </Tabs>
+      )}
     </main>
   );
 }

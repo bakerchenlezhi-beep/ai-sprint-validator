@@ -116,4 +116,25 @@ describe("runSimulation", () => {
     const events = await collect(run(streamTurn));
     expect(events.at(-1)).toEqual({ type: "error", message: "bad key", recoverable: false });
   });
+
+  it("retry runs only the requested persona, without addressing a user message", async () => {
+    const messages: ChatMessage[] = [
+      { id: "a", role: "persona", personaId: "p1", content: "hi", round: 0, status: "complete", createdAt: 0 },
+    ];
+    const { requests, streamTurn } = fakeLLM();
+    const events = await collect(run(streamTurn, { mode: "respond", messages, round: 0, onlyPersonaId: "p2" }));
+
+    expect(events.map((e) => e.type)).toEqual(["turn_start", "token", "token", "turn_end", "done"]);
+    expect(events[0]).toMatchObject({ personaId: "p2", round: 0 });
+    expect(requests).toHaveLength(1);
+    expect(requests[0].system).not.toContain("answer their latest message directly");
+    expect(requests[0].messages[0].content).toContain("Dana Whitfield: hi");
+  });
+
+  it("a retried last speaker still closes its round", async () => {
+    const { streamTurn } = fakeLLM();
+    const events = await collect(run(streamTurn, { mode: "respond", round: 1, onlyPersonaId: "p3" }));
+    expect(events.map((e) => e.type)).toEqual(["turn_start", "token", "token", "turn_end", "round_end", "done"]);
+    expect(events.find((e) => e.type === "round_end")).toEqual({ type: "round_end", round: 1 });
+  });
 });

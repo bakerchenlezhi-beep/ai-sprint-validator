@@ -167,8 +167,11 @@ Zod schemas in `lib/validation.ts` mirror these; LLM JSON outputs (personas, rep
 - ✔ Verify: with key — personas are pitch-specific, turns stream in P1→P2→P3 order and reference earlier speakers; Stop and interject abort cleanly (no orphan upstream calls); without key — identical UX in mock mode. Orchestrator tested with a fake LLM client (turn order, abort propagation of `signal`, error recovery).
 
 **M4 — Polish & Export**
-- `ExportMenu` (Markdown/JSON/copy via `lib/export.ts`), localStorage resume, loading skeletons, error/retry states, a11y (aria-live on stream, focus management), dark mode, "Demo data" badge, empty states, README with setup.
-- ✔ Verify: Playwright (or manual) smoke test of the happy path and the no-key path; Lighthouse a11y pass; exported Markdown matches the on-screen report.
+- `lib/export.ts` & `ExportMenu.tsx`: Export report to formatted Markdown, JSON, and direct clipboard copy.
+- Layout & Persistence: Fix responsive DOM layout in `/simulate` (remove double-rendered chat containers) and add `localStorage` snapshot persistence to recover state on page refresh.
+- UI Polish & Visual Indicators: Add loading skeletons, error/retry states on chat bubbles, dark mode polish, empty states, and a prominent "Demo Data" badge when running without an API key.
+- Accessibility & Docs: Add `aria-live` regions for streaming text, focus management, and a complete `README.md` with setup/env instructions.
+- ✔ Verify: Manual browser smoke test for happy path and no-key path; verify exported Markdown matches on-screen report; confirm `pnpm tsc --noEmit`, `pnpm lint`, and `pnpm test` pass with zero errors.
 
 ## Open risks
 - LLM JSON drift (mitigate: zod + retry + fallback). Cost runaway (mitigate: round/message/length caps). Persona homogeneity (mitigate: distinct speaking styles and explicit "disagree where your profile would" instruction).

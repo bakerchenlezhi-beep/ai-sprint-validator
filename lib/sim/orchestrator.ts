@@ -13,15 +13,17 @@ export interface OrchestratorInput {
   mode: "start" | "respond";
   round: number;
   rounds?: number; // for mode 'start'
+  onlyPersonaId?: string; // retry: regenerate just this persona's turn
   signal: AbortSignal;
   streamTurn: StreamTurn;
 }
 
 const TURN_MAX_TOKENS = 220;
 
-/** Turn order: 'start' runs `rounds` rounds p1 -> p3; 'respond' runs one round starting after the last speaker. */
+/** Turn order: 'start' runs `rounds` rounds p1 -> p3; 'respond' runs one round starting after the last speaker; a retry is a single turn. */
 function planTurns(input: OrchestratorInput): { persona: Persona; round: number }[] {
   const { personas, messages, mode, round } = input;
+  if (input.onlyPersonaId) return personas.filter((p) => p.id === input.onlyPersonaId).map((persona) => ({ persona, round }));
   if (mode === "start") {
     return Array.from({ length: input.rounds ?? 2 }, (_, r) => personas.map((persona) => ({ persona, round: round + r }))).flat();
   }
@@ -33,7 +35,7 @@ function planTurns(input: OrchestratorInput): { persona: Persona; round: number 
 export async function* runSimulation(input: OrchestratorInput): AsyncGenerator<SimEvent> {
   const { pitch, personas, signal } = input;
   const transcript = [...input.messages];
-  const respondingToUser = input.mode === "respond";
+  const respondingToUser = input.mode === "respond" && transcript.at(-1)?.role === "user";
 
   for (const [n, { persona, round }] of planTurns(input).entries()) {
     if (signal.aborted) return;
@@ -57,7 +59,9 @@ export async function* runSimulation(input: OrchestratorInput): AsyncGenerator<S
 
     yield { type: "turn_end", messageId };
     transcript.push({ id: messageId, role: "persona", personaId: persona.id, content: text, round, status: "complete", createdAt: Date.now() });
-    if ((n + 1) % personas.length === 0) yield { type: "round_end", round };
+    // A retried turn closes its round only if it was the round's last speaker.
+    const roundDone = input.onlyPersonaId ? persona === personas.at(-1) : (n + 1) % personas.length === 0;
+    if (roundDone) yield { type: "round_end", round };
   }
   yield { type: "done" };
 }

@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Sprint Validator
 
-## Getting Started
+Pitch a product idea and watch three synthetic users discuss it in turn. Jump in with your own questions, then generate a validation report you can export.
 
-First, run the development server:
+Built with Next.js (App Router), TypeScript, Tailwind v4 and shadcn/ui. See `PLAN.md` for the architecture.
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+corepack enable
+pnpm install
+cp .env.example .env.local   # optional: add an API key (see below)
+pnpm dev                     # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## LLM configuration
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+All LLM access goes through `lib/llm.ts` using the `openai` SDK, so any OpenAI-compatible provider works. Defaults target DeepSeek.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `LLM_BASE_URL` | `https://api.deepseek.com` | e.g. `https://api.openai.com/v1` |
+| `LLM_API_KEY` | _(empty)_ | falls back to `DEEPSEEK_API_KEY` |
+| `LLM_MODEL` | `deepseek-chat` | e.g. `gpt-4o-mini` |
 
-## Learn More
+**No key = mock mode.** Without a key the app runs the full flow on scripted demo data (the report shows a "Demo data" badge). If a real call fails, personas and the report fall back to demo data with a toast.
 
-To learn more about Next.js, take a look at the following resources:
+## Using it
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Enter a pitch; three personas are generated and discuss it for two rounds.
+2. Use **Stop** or type a question to interject; the personas answer you.
+3. If a reply fails, press **Retry** on that message to regenerate just that turn.
+4. **Generate report**, then export it as Markdown, JSON, or copy it to the clipboard.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+A refresh resumes the session from the last completed turn (stored in `localStorage`). **New pitch** starts over. Dark mode follows your system setting; use the button in the corner to override.
 
-## Deploy on Vercel
+## Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+pnpm dev        # dev server
+pnpm build      # production build
+pnpm lint       # eslint
+npx tsc --noEmit
+pnpm test       # Vitest unit tests
+```

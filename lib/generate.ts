@@ -4,7 +4,7 @@ import { LLMError, runLLMCompletion, type LLMRequest } from "@/lib/llm";
 import { buildPersonasPrompt, buildReportPrompt } from "@/lib/prompts";
 import { mockPersonas, mockReport } from "@/lib/sim/mock";
 import { llmPersonasSchema, llmReportSchema } from "@/lib/validation";
-import type { ChatMessage, Persona, ProductPitch, SimulationReport } from "@/types";
+import type { ChatMessage, Persona, ProductPitch } from "@/types";
 
 const AVATAR_COLORS = ["bg-sky-500", "bg-amber-500", "bg-emerald-500"];
 
@@ -22,18 +22,25 @@ async function completeJson<T>(req: LLMRequest, schema: z.ZodType<T>): Promise<T
   throw lastError;
 }
 
-/** Any failure other than the caller aborting falls back to mock data. */
-async function withMockFallback<T>(real: () => Promise<T>, mock: () => Promise<T>, signal: AbortSignal): Promise<T> {
-  if (!hasApiKey()) return mock();
+/**
+ * Any failure other than the caller aborting falls back to mock data. `fellBack` is true only when a
+ * real call failed; running without a key is plain mock mode and not reported as a fallback.
+ */
+async function withMockFallback<T>(
+  real: () => Promise<T>,
+  mock: () => Promise<T>,
+  signal: AbortSignal,
+): Promise<{ value: T; fellBack: boolean }> {
+  if (!hasApiKey()) return { value: await mock(), fellBack: false };
   try {
-    return await real();
+    return { value: await real(), fellBack: false };
   } catch (err) {
     if (signal.aborted || (err instanceof LLMError && err.kind === "aborted")) throw err;
-    return mock();
+    return { value: await mock(), fellBack: true };
   }
 }
 
-export function generatePersonas(pitch: ProductPitch, signal: AbortSignal): Promise<Persona[]> {
+export function generatePersonas(pitch: ProductPitch, signal: AbortSignal) {
   return withMockFallback(
     async () => {
       const { personas } = await completeJson({ ...buildPersonasPrompt(pitch), signal }, llmPersonasSchema);
@@ -44,12 +51,7 @@ export function generatePersonas(pitch: ProductPitch, signal: AbortSignal): Prom
   );
 }
 
-export function generateReport(
-  pitch: ProductPitch,
-  personas: Persona[],
-  messages: ChatMessage[],
-  signal: AbortSignal,
-): Promise<SimulationReport> {
+export function generateReport(pitch: ProductPitch, personas: Persona[], messages: ChatMessage[], signal: AbortSignal) {
   return withMockFallback(
     async () => {
       const report = await completeJson({ ...buildReportPrompt(pitch, personas, messages), signal }, llmReportSchema);

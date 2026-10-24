@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage, ProductPitch, SimulationReport } from "@/types";
 import { MOCK_PERSONAS } from "./mock";
-import { initialState, simReducer, type SimAction, type SimState } from "./reducer";
+import { initialState, restoreState, simReducer, type SimAction, type SimState } from "./reducer";
 
 const pitch: ProductPitch = { id: "x", title: "TaskPilot", description: "A planner for freelancers." };
 
@@ -90,5 +90,53 @@ describe("simReducer", () => {
 
   it("RESET returns the initial state", () => {
     expect(run([{ type: "PITCH_SUBMITTED", pitch }, { type: "RESET" }])).toEqual(initialState);
+  });
+});
+
+describe("RETRY_TURN", () => {
+  const failed = run([
+    { type: "PITCH_SUBMITTED", pitch },
+    { type: "PERSONAS_READY", personas: MOCK_PERSONAS },
+    ...turn("m1", "p1", 0, "first"),
+    { type: "turn_start", personaId: "p2", round: 0, messageId: "m2" },
+    { type: "token", messageId: "m2", delta: "partial" },
+    { type: "error", message: "boom", recoverable: true },
+  ]);
+
+  it("drops the failed message, clears the error and goes back to running", () => {
+    expect(failed.status).toBe("awaitingUser");
+    expect(failed.messages[1].status).toBe("error");
+    const s = simReducer(failed, { type: "RETRY_TURN" });
+    expect(s.messages.map((m) => m.id)).toEqual(["m1"]);
+    expect(s.error).toBeNull();
+    expect(s.status).toBe("running");
+  });
+
+  it("keeps messages when the last one did not fail", () => {
+    const ok = run(turn("m1", "p1", 0, "hi"));
+    expect(simReducer(ok, { type: "RETRY_TURN" }).messages).toHaveLength(1);
+  });
+});
+
+describe("restoreState", () => {
+  const base = run([{ type: "PITCH_SUBMITTED", pitch }, { type: "PERSONAS_READY", personas: MOCK_PERSONAS }, { type: "SIM_STARTED" }]);
+
+  it("turns a mid-stream snapshot into awaitingUser, keeping partial text as complete", () => {
+    const mid = run([{ type: "turn_start", personaId: "p1", round: 0, messageId: "m1" }, { type: "token", messageId: "m1", delta: "par" }], base);
+    const s = restoreState(mid);
+    expect(s.status).toBe("awaitingUser");
+    expect(s.activePersonaId).toBeNull();
+    expect(s.messages[0]).toMatchObject({ content: "par", status: "complete" });
+  });
+
+  it("resumes reporting and error snapshots as awaitingUser", () => {
+    expect(restoreState({ ...base, status: "reporting" }).status).toBe("awaitingUser");
+    expect(restoreState({ ...base, status: "error", error: "x" })).toMatchObject({ status: "awaitingUser", error: null });
+  });
+
+  it("keeps a finished report", () => {
+    const report = { verdict: "promising", overallScore: 1, perPersona: [], themes: [], risks: [], suggestedExperiments: [], openQuestions: [], generatedAt: 0, source: "llm" } as SimulationReport;
+    const done = run([{ type: "REPORT_READY", report }], base);
+    expect(restoreState(done)).toMatchObject({ status: "done", report });
   });
 });

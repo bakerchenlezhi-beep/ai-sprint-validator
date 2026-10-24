@@ -60,6 +60,7 @@ export const simulateRequestSchema = z.object({
   ...transcriptFields,
   mode: z.enum(["start", "respond"]),
   round: z.number().int().min(0),
+  onlyPersonaId: z.string().optional(),
 });
 
 export const reportRequestSchema = z.object(transcriptFields);
