@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { ThemeProvider } from "next-themes";
-import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -16,23 +14,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Sprint Validator",
-  description: "Pitch an idea and get feedback from synthetic users.",
+  title: "Critiq",
+  description: "Stress-test your idea with synthetic users before you build it.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-      suppressHydrationWarning
+      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col pb-16">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          {children}
-          <ThemeToggle />
-          <Toaster />
-        </ThemeProvider>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Toaster />
       </body>
     </html>
   );

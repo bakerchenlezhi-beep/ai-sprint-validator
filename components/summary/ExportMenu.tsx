@@ -15,15 +15,15 @@ function download(filename: string, text: string, type: string) {
 export function ExportMenu({ report, personas, title }: { report: SimulationReport; personas: Persona[]; title: string }) {
   const markdown = () => reportToMarkdown(report, personas, title);
   return (
-    <div className="flex flex-wrap gap-2" role="group" aria-label="Export report">
-      <Button variant="outline" size="sm" onClick={() => download("report.md", markdown(), "text/markdown")}>
+    <div className="inline-flex w-fit gap-0.5 rounded-lg bg-background p-0.5 ring-1 ring-white/8" role="group" aria-label="Export report">
+      <Button variant="ghost" size="sm" onClick={() => download("report.md", markdown(), "text/markdown")}>
         Markdown
       </Button>
-      <Button variant="outline" size="sm" onClick={() => download("report.json", reportToJson(report), "application/json")}>
+      <Button variant="ghost" size="sm" onClick={() => download("report.json", reportToJson(report), "application/json")}>
         JSON
       </Button>
       <Button
-        variant="outline"
+        variant="ghost"
         size="sm"
         onClick={() =>
           navigator.clipboard.writeText(markdown()).then(

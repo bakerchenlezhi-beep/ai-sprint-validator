@@ -1,4 +1,4 @@
-# AI Sprint Validator
+# Critiq (AI Sprint Validator)
 
 Pitch a product idea and watch three synthetic users discuss it in turn. Jump in with your own questions, then generate a validation report you can export.
 

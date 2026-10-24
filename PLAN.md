@@ -1,6 +1,6 @@
 # Context
 
-Greenfield repo (`package.json` only). Goal: plan the "AI Sprint Validator & Synthetic User Simulator" — Next.js App Router + TypeScript + Tailwind + shadcn/ui. A builder submits a pitch; 3 synthetic personas discuss it in turn; the user can interject; a final report is produced. The deliverable of this step is a `PLAN.md` at the repo root (no app code). **On approval, the content below is written verbatim to `/Users/chenyuezhi/Documents/Coding/my-first-vibe-app/PLAN.md`**, then we stop and wait for explicit go-ahead before any implementation.
+Greenfield repo (`package.json` only). Goal: plan "Critiq" (originally "AI Sprint Validator & Synthetic User Simulator") — Next.js App Router + TypeScript + Tailwind + shadcn/ui. A builder submits a pitch; 3 synthetic personas discuss it in turn; the user can interject; a final report is produced. The deliverable of this step is a `PLAN.md` at the repo root (no app code). **On approval, the content below is written verbatim to `/Users/chenyuezhi/Documents/Coding/my-first-vibe-app/PLAN.md`**, then we stop and wait for explicit go-ahead before any implementation.
 
 Assumptions (flag if wrong):
 - **Package manager: pnpm** (all commands below use `pnpm`; commit `pnpm-lock.yaml`).

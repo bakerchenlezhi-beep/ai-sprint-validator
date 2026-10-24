@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PitchForm } from "@/components/pitch/PitchForm";
@@ -31,11 +31,20 @@ describe("PitchForm", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it.each([["{Meta>}{Enter}{/Meta}"], ["{Control>}{Enter}{/Control}"]])("submits on %s from the pitch textarea", async (keys) => {
+    render(<PitchForm />);
+    await userEvent.type(screen.getByLabelText("Product name"), "TaskPilot");
+    await userEvent.type(screen.getByLabelText("Pitch"), "An AI planner that turns messy to-do lists into a daily schedule.");
+    await userEvent.keyboard(keys);
+    expect(push).toHaveBeenCalledWith("/simulate");
+  });
+
   it("stores the pitch and routes to /simulate when valid", async () => {
     render(<PitchForm />);
     await userEvent.type(screen.getByLabelText("Product name"), "TaskPilot");
     await userEvent.type(screen.getByLabelText("Pitch"), "An AI planner that turns messy to-do lists into a daily schedule.");
-    await userEvent.selectOptions(screen.getByLabelText("Stage (optional)"), "prototype");
+    const stage = screen.getByRole("radiogroup", { name: "Stage (optional)" });
+    await userEvent.click(within(stage).getByRole("radio", { name: "Prototype" }));
     await userEvent.click(screen.getByRole("button", { name: "Start simulation" }));
 
     expect(push).toHaveBeenCalledWith("/simulate");

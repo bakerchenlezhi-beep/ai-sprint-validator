@@ -66,7 +66,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Project
 
-Next.js (App Router, TypeScript, Tailwind v4, shadcn/ui) app, "AI Sprint Validator". `PLAN.md` is the source of truth for architecture and milestones (all milestones, M1 setup through M4 polish & export, are 100% complete; 36 unit tests pass, and `pnpm build`, `pnpm lint` and `npx tsc --noEmit` are clean, so the app is ready for a production run). Any further work needs the user's approval first.
+Next.js (App Router, TypeScript, Tailwind v4, shadcn/ui) app, "Critiq" (formerly "AI Sprint Validator"; UI is dark-only, indigo accent). `PLAN.md` is the source of truth for architecture and milestones (all milestones, M1 setup through M4 polish & export, are 100% complete; 59 unit tests pass, and `pnpm build`, `pnpm lint` and `npx tsc --noEmit` are clean, so the app is ready for a production run). Any further work needs the user's approval first.
 
 - Package manager: **pnpm** (via corepack). Commands: `pnpm dev`, `pnpm build`, `pnpm lint`, `npx tsc --noEmit`, `pnpm test` (Vitest; single file: `pnpm vitest run lib/sim/sse.test.ts`).
 - This Next.js version has breaking changes: per `AGENTS.md`, read the relevant guide in `node_modules/next/dist/docs/` before writing Next-specific code.

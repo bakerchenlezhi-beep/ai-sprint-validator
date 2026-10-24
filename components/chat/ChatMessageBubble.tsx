@@ -1,20 +1,29 @@
+import { PersonaAvatar } from "@/components/personas/PersonaAvatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, Persona } from "@/types";
 
 export function ChatMessageBubble({ message, persona, onRetry }: { message: ChatMessage; persona?: Persona; onRetry?: () => void }) {
   const isUser = message.role === "user";
+  const name = isUser ? "You" : (persona?.name ?? "System");
   return (
-    <div className={cn("flex gap-2", isUser && "flex-row-reverse")}>
-      {!isUser && <span aria-hidden className={cn("mt-1 size-6 shrink-0 rounded-full", persona?.avatarColor ?? "bg-muted")} />}
-      <div className={cn("max-w-[85%] rounded-lg px-3 py-2 text-sm", isUser ? "bg-primary text-primary-foreground" : "bg-muted")}>
-        <p className="mb-0.5 text-xs font-medium opacity-70">{isUser ? "You" : (persona?.name ?? "System")}</p>
-        <p className="whitespace-pre-wrap">
-          {message.content}
-          {message.status === "streaming" && <span className="ml-0.5 inline-block animate-pulse">▍</span>}
-        </p>
+    <div className={cn("animate-fade-in-up flex gap-3", isUser && "flex-row-reverse")}>
+      {!isUser && <PersonaAvatar name={name} className="mt-0.5" />}
+      <div className={cn("flex min-w-0 max-w-[85%] flex-col gap-1", isUser && "items-end")}>
+        <div className={cn("flex items-baseline gap-2", isUser && "flex-row-reverse")}>
+          <p className="text-xs font-medium text-foreground">{name}</p>
+          {!isUser && (
+            <span className="font-mono text-[11px] text-muted-foreground">{message.round === 0 ? "Opening" : `Round ${message.round}`}</span>
+          )}
+        </div>
+        <div className={cn("text-sm leading-relaxed", isUser && "rounded-xl bg-primary px-3.5 py-2 text-primary-foreground")}>
+          <p className="whitespace-pre-wrap">
+            {message.content}
+            {message.status === "streaming" && <span className="ml-0.5 inline-block animate-pulse">▍</span>}
+          </p>
+        </div>
         {message.status === "error" && (
-          <p className="mt-1 flex items-center gap-2 text-xs text-destructive">
+          <p className="flex items-center gap-2 text-xs text-destructive">
             This reply failed.
             {onRetry && (
               <Button variant="outline" size="xs" onClick={onRetry}>

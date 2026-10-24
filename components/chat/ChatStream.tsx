@@ -12,11 +12,11 @@ export function ChatStream({ messages, personas, onRetry }: { messages: ChatMess
   }, [messages]);
 
   return (
-    <div role="log" aria-label="Discussion" aria-live="polite" className="h-96 overflow-y-auto rounded-lg border p-4">
+    <div role="log" aria-label="Discussion" aria-live="polite" className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8">
       {messages.length === 0 ? (
-        <p className="text-sm text-muted-foreground">The conversation will appear here.</p>
+        <p className="mx-auto max-w-3xl text-sm text-muted-foreground">The conversation will appear here.</p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="mx-auto flex max-w-3xl flex-col gap-6">
           {messages.map((m) => (
             <ChatMessageBubble
               key={m.id}

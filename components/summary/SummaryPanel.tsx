@@ -3,20 +3,45 @@
 import { useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExportMenu } from "@/components/summary/ExportMenu";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Persona, SimStatus, SimulationReport } from "@/types";
 
 const SENTIMENT = { "-1": "Negative", "0": "Mixed", "1": "Positive" } as const;
 
+function ScoreRing({ score }: { score: number }) {
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  return (
+    <div aria-hidden className="relative size-16 shrink-0">
+      <svg viewBox="0 0 64 64" className="size-full -rotate-90">
+        <circle cx="32" cy="32" r={r} fill="none" strokeWidth="5" className="stroke-white/8" />
+        <circle
+          cx="32"
+          cy="32"
+          r={r}
+          fill="none"
+          strokeWidth="5"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - Math.min(100, Math.max(0, score)) / 100)}
+          className="stroke-primary"
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center font-mono text-sm font-medium tabular-nums">{score}</span>
+    </div>
+  );
+}
+
 function List({ title, items }: { title: string; items: string[] }) {
   return (
-    <div>
-      <h3 className="mb-1 text-xs font-medium uppercase text-muted-foreground">{title}</h3>
-      <ul className="list-disc space-y-1 pl-4">
+    <div className="flex flex-col gap-2">
+      <h3 className="text-xs font-medium text-muted-foreground">{title}</h3>
+      <ul className="flex flex-col gap-1.5">
         {items.map((item) => (
-          <li key={item}>{item}</li>
+          <li key={item} className="rounded-lg bg-background px-3 py-2 text-sm ring-1 ring-white/6">
+            {item}
+          </li>
         ))}
       </ul>
     </div>
@@ -45,38 +70,40 @@ export function SummaryPanel({
   }, [status]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between gap-2">
-          Summary
-          {report?.source === "mock" && <Badge variant="secondary">Demo data</Badge>}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+    <section className="flex flex-col gap-6 p-5">
+      <h2 className="flex items-center justify-between gap-2 text-sm font-medium">
+        Summary
+        {report?.source === "mock" && <Badge variant="secondary">Demo data</Badge>}
+      </h2>
+      <div className="flex flex-col gap-6">
         {report ? (
           <>
-            <div>
-              <p ref={headingRef} tabIndex={-1} className="text-2xl font-semibold capitalize outline-none">
-                {report.verdict}
-              </p>
-              <p className="text-sm text-muted-foreground">Score {report.overallScore}/100</p>
+            <div className="flex items-center gap-4">
+              <ScoreRing score={report.overallScore} />
+              <div>
+                <p ref={headingRef} tabIndex={-1} className="text-2xl font-semibold tracking-tight capitalize outline-none">
+                  {report.verdict}
+                </p>
+                <p className="text-sm text-muted-foreground tabular-nums">Score {report.overallScore}/100</p>
+              </div>
             </div>
-            <ul className="space-y-2">
+            <ul className="flex flex-col gap-2">
               {report.perPersona.map((r) => (
-                <li key={r.personaId}>
+                <li key={r.personaId} className="rounded-lg bg-background px-3 py-2.5 text-sm ring-1 ring-white/6">
                   <p className="font-medium">
                     {personas.find((p) => p.id === r.personaId)?.name ?? r.personaId}{" "}
                     <span className="font-normal text-muted-foreground">
                       · {SENTIMENT[String(r.sentiment) as keyof typeof SENTIMENT]} · {r.wouldPay ? "would pay" : "wouldn't pay"}
                     </span>
                   </p>
-                  <p className="italic text-muted-foreground">“{r.keyQuote}”</p>
+                  <p className="mt-1 text-muted-foreground italic">“{r.keyQuote}”</p>
                 </li>
               ))}
             </ul>
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {report.themes.map((t) => (
-                <Badge key={t.label} variant={t.type === "concern" ? "destructive" : "secondary"}>
+                <Badge key={t.label} variant="outline" className="h-6 gap-1.5 px-2.5">
+                  <span aria-hidden className={t.type === "concern" ? "size-1.5 rounded-full bg-destructive" : "size-1.5 rounded-full bg-primary"} />
                   {t.label} ×{t.mentions}
                 </Badge>
               ))}
@@ -104,7 +131,7 @@ export function SummaryPanel({
             </Button>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
